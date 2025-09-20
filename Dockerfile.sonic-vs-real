@@ -1,0 +1,243 @@
+# Real SONiC Virtual Switch Container
+FROM ubuntu:20.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install SONiC dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    redis-server \
+    openssh-server \
+    net-tools \
+    iproute2 \
+    bridge-utils \
+    vlan \
+    tcpdump \
+    curl \
+    jq \
+    supervisor \
+    sudo \
+    vim \
+    iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages for SONiC
+RUN pip3 install \
+    redis==4.6.0 \
+    pyyaml==6.0.1 \
+    jsonschema==4.19.0 \
+    click==8.1.7 \
+    tabulate==0.9.0 \
+    natsort==8.4.0
+
+# Create SONiC user
+RUN useradd -m -s /bin/bash admin && \
+    echo 'admin:YourPaSsWoRd' | chpasswd && \
+    usermod -aG sudo admin && \
+    echo 'admin ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+# Create SONiC directories
+RUN mkdir -p /etc/sonic /var/log/sonic /usr/local/bin /var/lib/redis /etc/redis
+
+# Copy SONiC configuration
+COPY configs/sonic/config_db.json /etc/sonic/config_db.json
+
+# Create Redis configuration for SONiC databases
+RUN cat > /etc/redis/redis.conf << 'EOF'
+# SONiC Redis Configuration
+port 6379
+bind 0.0.0.0
+protected-mode no
+save 900 1
+save 300 10
+save 60 10000
+rdbcompression yes
+dbfilename sonic.rdb
+dir /var/lib/redis
+maxmemory-policy allkeys-lru
+
+# SONiC Database Configuration
+databases 16
+
+# Database 0: APPL_DB
+# Database 1: ASIC_DB  
+# Database 2: COUNTERS_DB
+# Database 3: LOGLEVEL_DB
+# Database 4: CONFIG_DB
+# Database 5: PFC_WD_DB
+# Database 6: STATE_DB
+# Database 7: SNMP_OVERLAY_DB
+EOF
+
+# Copy SONiC CLI scripts
+COPY scripts/sonic/mock-sonic-cli.py /usr/local/bin/sonic-cli
+RUN chmod +x /usr/local/bin/sonic-cli
+
+# Create SONiC CLI command links
+RUN ln -sf /usr/local/bin/sonic-cli /usr/local/bin/show && \
+    ln -sf /usr/local/bin/sonic-cli /usr/local/bin/config && \
+    ln -sf /usr/local/bin/sonic-cli /usr/local/bin/sonic-cfggen
+
+# Create SONiC service scripts
+RUN cat > /usr/local/bin/sonic-init.py << 'EOF'
+#!/usr/bin/env python3
+"""
+SONiC Initialization Script
+Initializes SONiC databases and configuration
+"""
+
+import redis
+import json
+import time
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('sonic-init')
+
+def init_sonic_databases():
+    """Initialize SONiC databases with default configuration"""
+    try:
+        # Connect to Redis
+        r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+        
+        # Wait for Redis to be ready
+        for i in range(30):
+            try:
+                r.ping()
+                break
+            except:
+                time.sleep(1)
+        
+        logger.info("Initializing SONiC databases...")
+        
+        # Initialize CONFIG_DB (DB 4)
+        config_db = redis.Redis(host='localhost', port=6379, db=4, decode_responses=True)
+        
+        # Load initial configuration
+        with open('/etc/sonic/config_db.json', 'r') as f:
+            config = json.load(f)
+        
+        # Populate CONFIG_DB
+        for table, entries in config.items():
+            for key, data in entries.items():
+                redis_key = f"{table}|{key}"
+                config_db.hmset(redis_key, data)
+                logger.info(f"Loaded {redis_key}")
+        
+        # Initialize APPL_DB (DB 0) with port table
+        appl_db = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+        
+        # Add default ports to APPL_DB
+        for port_name in ['Ethernet0', 'Ethernet4', 'Ethernet8', 'Ethernet12', 'Ethernet16', 'Ethernet20']:
+            port_key = f"PORT_TABLE:{port_name}"
+            appl_db.hmset(port_key, {
+                'admin_status': 'up',
+                'oper_status': 'up',
+                'speed': '25000',
+                'mtu': '9100'
+            })
+            logger.info(f"Initialized {port_key}")
+        
+        # Initialize STATE_DB (DB 6)
+        state_db = redis.Redis(host='localhost', port=6379, db=6, decode_responses=True)
+        
+        # Add port states
+        for port_name in ['Ethernet0', 'Ethernet4', 'Ethernet8', 'Ethernet12', 'Ethernet16', 'Ethernet20']:
+            state_key = f"PORT_TABLE|{port_name}"
+            state_db.hmset(state_key, {
+                'state': 'ok',
+                'netdev_oper_status': 'up',
+                'admin_status': 'up'
+            })
+        
+        logger.info("SONiC databases initialized successfully")
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize SONiC databases: {e}")
+        raise
+
+if __name__ == "__main__":
+    init_sonic_databases()
+EOF
+
+RUN chmod +x /usr/local/bin/sonic-init.py
+
+# Configure SSH
+RUN mkdir /var/run/sshd && \
+    echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PermitEmptyPasswords no/PermitEmptyPasswords no/' /etc/ssh/sshd_config
+
+# Create Supervisor configuration
+RUN cat > /etc/supervisor/conf.d/sonic.conf << 'EOF'
+[supervisord]
+nodaemon=true
+user=root
+logfile=/var/log/supervisord.log
+pidfile=/var/run/supervisord.pid
+
+[program:redis]
+command=redis-server /etc/redis/redis.conf
+autostart=true
+autorestart=true
+stdout_logfile=/var/log/redis.log
+stderr_logfile=/var/log/redis.log
+priority=100
+
+[program:sonic-init]
+command=/usr/local/bin/sonic-init.py
+autostart=true
+autorestart=false
+stdout_logfile=/var/log/sonic-init.log
+stderr_logfile=/var/log/sonic-init.log
+priority=200
+depends_on=redis
+
+[program:sshd]
+command=/usr/sbin/sshd -D
+autostart=true
+autorestart=true
+stdout_logfile=/var/log/sshd.log
+stderr_logfile=/var/log/sshd.log
+priority=300
+EOF
+
+# Create health check script
+RUN cat > /usr/local/bin/health-check.sh << 'EOF'
+#!/bin/bash
+# SONiC health check
+
+# Check Redis
+if ! redis-cli ping > /dev/null 2>&1; then
+    echo "Redis not responding"
+    exit 1
+fi
+
+# Check SSH
+if ! pgrep sshd > /dev/null; then
+    echo "SSH daemon not running"
+    exit 1
+fi
+
+# Check SONiC databases
+if ! redis-cli -n 4 EXISTS "DEVICE_METADATA|localhost" > /dev/null 2>&1; then
+    echo "SONiC configuration not loaded"
+    exit 1
+fi
+
+echo "SONiC is healthy"
+exit 0
+EOF
+
+RUN chmod +x /usr/local/bin/health-check.sh
+
+# Expose ports
+EXPOSE 22 6379
+
+# Set working directory
+WORKDIR /etc/sonic
+
+# Start SONiC services
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/sonic.conf"]

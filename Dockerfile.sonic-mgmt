@@ -1,0 +1,43 @@
+# SONiC Management Interface
+FROM node:16-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    openssh-client \
+    sshpass \
+    curl \
+    jq \
+    redis
+
+# Install Python dependencies for SONiC integration
+COPY requirements-mgmt.txt /tmp/
+RUN pip3 install --no-cache-dir -r /tmp/requirements-mgmt.txt
+
+# Create application directory
+WORKDIR /app
+
+# Copy management application
+COPY src/web/ /app/web/
+COPY src/python/sonic_mgmt_api.py /app/
+COPY scripts/ /app/scripts/
+
+# Install Node.js dependencies (if web interface exists)
+# RUN cd /app/web && npm install
+
+# Create directories
+RUN mkdir -p /var/log/sonic-mgmt /var/lib/sonic-mgmt
+
+# Set permissions
+RUN chmod +x /app/scripts/**/*.sh
+
+# Expose management port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+# Start management interface
+CMD ["python3", "/app/sonic_mgmt_api.py"]

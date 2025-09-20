@@ -1,0 +1,157 @@
+version: '3.8'
+
+services:
+  # SONiC Redis Database (using official SONiC schema)
+  sonic-redis:
+    image: redis:7-alpine
+    container_name: sonic-redis
+    hostname: sonic-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./configs/redis/sonic-redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - sonic-redis-data:/data
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - sonic-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Mock SONiC Orchestration Agent
+  sonic-orchagent:
+    build:
+      context: .
+      dockerfile: Dockerfile.sonic-orchagent
+    container_name: sonic-orchagent
+    hostname: sonic-orchagent
+    depends_on:
+      sonic-redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=sonic-redis
+      - REDIS_PORT=6379
+    volumes:
+      - sonic-logs:/var/log/swss
+    networks:
+      - sonic-net
+    restart: unless-stopped
+
+  # Mock SONiC Sync Daemon
+  sonic-syncd:
+    build:
+      context: .
+      dockerfile: Dockerfile.sonic-syncd
+    container_name: sonic-syncd
+    hostname: sonic-syncd
+    depends_on:
+      sonic-redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=sonic-redis
+      - REDIS_PORT=6379
+    volumes:
+      - sonic-logs:/var/log/swss
+    networks:
+      - sonic-net
+    restart: unless-stopped
+
+  # SONiC CLI Interface
+  sonic-cli:
+    build:
+      context: .
+      dockerfile: Dockerfile.sonic-cli
+    container_name: sonic-cli
+    hostname: sonic-cli
+    ports:
+      - "2222:22"
+    depends_on:
+      sonic-redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=sonic-redis
+      - REDIS_PORT=6379
+    volumes:
+      - sonic-logs:/var/log
+    networks:
+      - sonic-net
+    restart: unless-stopped
+
+  # SAI Demo Application
+  sonic-sai-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.sai-demo-simple
+    container_name: sonic-sai-demo
+    hostname: sonic-sai-demo
+    ports:
+      - "8091:8080"
+    depends_on:
+      - sonic-redis
+      - sonic-orchagent
+      - sonic-syncd
+      - sonic-cli
+    environment:
+      - REDIS_HOST=sonic-redis
+      - REDIS_PORT=6379
+      - SONIC_CLI_HOST=sonic-cli
+      - SONIC_CLI_PORT=22
+    volumes:
+      - sonic-logs:/var/log
+    networks:
+      - sonic-net
+    restart: unless-stopped
+
+  # BSP Demo Application
+  sonic-bsp-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.bsp-demo-simple
+    container_name: sonic-bsp-demo
+    hostname: sonic-bsp-demo
+    ports:
+      - "8092:8080"
+    environment:
+      - SONIC_CLI_HOST=sonic-cli
+    volumes:
+      - sonic-logs:/var/log
+    networks:
+      - sonic-net
+    restart: unless-stopped
+
+  # Management Interface
+  sonic-mgmt:
+    build:
+      context: .
+      dockerfile: Dockerfile.sonic-mgmt-simple
+    container_name: sonic-mgmt
+    hostname: sonic-mgmt
+    ports:
+      - "3000:3000"
+    depends_on:
+      - sonic-sai-demo
+      - sonic-bsp-demo
+    environment:
+      - REDIS_HOST=sonic-redis
+      - REDIS_PORT=6379
+      - SAI_DEMO_URL=http://sonic-sai-demo:8080
+      - BSP_DEMO_URL=http://sonic-bsp-demo:8080
+    networks:
+      - sonic-net
+    restart: unless-stopped
+
+networks:
+  sonic-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+
+volumes:
+  sonic-redis-data:
+    driver: local
+  sonic-logs:
+    driver: local

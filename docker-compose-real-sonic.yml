@@ -1,0 +1,170 @@
+version: '3.8'
+
+services:
+  # Official SONiC Virtual Switch
+  sonic-vs-official:
+    image: docker-sonic-vs:latest
+    container_name: sonic-vs-official
+    hostname: sonic-vs
+    privileged: true
+    networks:
+      sonic-net:
+        ipv4_address: 172.25.0.10
+    ports:
+      - "2222:22"      # SSH access
+      - "6379:6379"    # Redis access
+    volumes:
+      - sonic-logs:/var/log
+      - sonic-config:/etc/sonic
+    environment:
+      - SONIC_HOSTNAME=sonic-vs
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  # SAI Demo Application (connects to real SONiC)
+  sonic-sai-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.sai-demo-real
+    container_name: sonic-sai-demo
+    depends_on:
+      sonic-vs-official:
+        condition: service_healthy
+    networks:
+      sonic-net:
+        ipv4_address: 172.25.0.20
+    ports:
+      - "8091:8080"
+    volumes:
+      - sonic-logs:/var/log:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - SONIC_HOST=172.25.0.10
+      - SONIC_SSH_PORT=22
+      - SONIC_USER=admin
+      - SONIC_PASS=YourPaSsWoRd
+      - REDIS_HOST=172.25.0.10
+      - REDIS_PORT=6379
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # BSP Demo Application (connects to real SONiC)
+  sonic-bsp-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.bsp-demo-real
+    container_name: sonic-bsp-demo
+    depends_on:
+      sonic-vs-official:
+        condition: service_healthy
+    networks:
+      sonic-net:
+        ipv4_address: 172.25.0.21
+    ports:
+      - "8092:8080"
+    volumes:
+      - sonic-logs:/var/log:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - SONIC_HOST=172.25.0.10
+      - SONIC_SSH_PORT=22
+      - SONIC_USER=admin
+      - SONIC_PASS=YourPaSsWoRd
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # Management Interface (connects to real SONiC)
+  sonic-mgmt:
+    build:
+      context: .
+      dockerfile: Dockerfile.sonic-mgmt-real
+    container_name: sonic-mgmt-official
+    depends_on:
+      sonic-vs-official:
+        condition: service_healthy
+    networks:
+      sonic-net:
+        ipv4_address: 172.25.0.30
+    ports:
+      - "3000:3000"
+    volumes:
+      - sonic-logs:/var/log:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - SONIC_HOST=172.25.0.10
+      - SONIC_SSH_PORT=22
+      - SONIC_USER=admin
+      - SONIC_PASS=YourPaSsWoRd
+      - REDIS_HOST=172.25.0.10
+      - REDIS_PORT=6379
+      - SAI_DEMO_URL=http://172.25.0.20:8080
+      - BSP_DEMO_URL=http://172.25.0.21:8080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # C++ Functional Test Suite (HAL and SAI Testing)
+  sonic-cpp-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.sonic-cpp-tests
+    container_name: sonic-cpp-tests
+    depends_on:
+      sonic-vs-official:
+        condition: service_healthy
+    networks:
+      sonic-net:
+        ipv4_address: 172.25.0.40
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - sonic-logs:/var/log:rw
+      - ./test_results:/sonic_tests/results
+    environment:
+      - SONIC_CONTAINER_NAME=sonic-vs-official
+      - TEST_RESULTS_DIR=/sonic_tests/results
+    working_dir: /sonic_tests
+    # Don't start automatically - run tests manually
+    profiles:
+      - testing
+    healthcheck:
+      test: ["CMD", "./build/sonic_functional_tests", "--quick", "--quiet"]
+      interval: 60s
+      timeout: 30s
+      retries: 2
+      start_period: 10s
+
+volumes:
+  sonic-logs:
+    driver: local
+  sonic-config:
+    driver: local
+
+networks:
+  sonic-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+          gateway: 172.25.0.1
+    driver_opts:
+      com.docker.network.bridge.name: sonic-br
+      com.docker.network.driver.mtu: 1500

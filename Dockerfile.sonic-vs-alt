@@ -1,0 +1,49 @@
+FROM ubuntu:20.04
+
+# Install SONiC dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    redis-server \
+    openssh-server \
+    net-tools \
+    iproute2 \
+    bridge-utils \
+    vlan \
+    tcpdump \
+    curl \
+    jq \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages
+RUN pip3 install redis pyyaml jsonschema
+
+# Create SONiC user
+RUN useradd -m -s /bin/bash admin && \
+    echo 'admin:YourPaSsWoRd' | chpasswd && \
+    usermod -aG sudo admin
+
+# Create SONiC directories
+RUN mkdir -p /etc/sonic /var/log/sonic /usr/local/bin
+
+# Copy mock SONiC CLI scripts
+COPY scripts/sonic/mock-sonic-cli.py /usr/local/bin/
+RUN chmod +x /usr/local/bin/mock-sonic-cli.py
+
+# Create symbolic links for SONiC commands
+RUN ln -s /usr/local/bin/mock-sonic-cli.py /usr/local/bin/sonic-cfggen && \
+    ln -s /usr/local/bin/mock-sonic-cli.py /usr/local/bin/show && \
+    ln -s /usr/local/bin/mock-sonic-cli.py /usr/local/bin/config
+
+# Configure SSH
+RUN mkdir /var/run/sshd && \
+    echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+# Supervisor configuration
+COPY supervisord-sonic-vs.conf /etc/supervisor/conf.d/supervisord.conf
+
+EXPOSE 22 8080 9090 6379
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

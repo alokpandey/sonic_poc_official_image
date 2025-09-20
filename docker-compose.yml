@@ -1,0 +1,208 @@
+
+
+version: '3.8'
+
+services:
+  # SONiC C++ Implementation Container
+  sonic-cpp:
+    image: sonic-cpp-complete:latest
+    container_name: sonic-cpp
+    hostname: sonic-cpp
+    privileged: true
+    networks:
+      sonic-mgmt:
+        ipv4_address: 172.20.0.10
+      sonic-data:
+        ipv4_address: 172.21.0.10
+    ports:
+      - "8090:8080"    # BSP API (mapped to avoid conflicts)
+      - "8091:8081"    # SAI API (mapped to avoid conflicts)
+      - "8092:8082"    # Test API (mapped to avoid conflicts)
+      - "9091:9090"    # Metrics (mapped to avoid conflicts)
+    volumes:
+      - ./configs:/opt/sonic/etc:rw
+      - ./logs:/opt/sonic/var/log:rw
+      - ./scripts:/opt/sonic/scripts:ro
+      - ./results:/opt/sonic/results:rw
+      - sonic-cpp-data:/opt/sonic/var/run:rw
+    environment:
+      - SONIC_CONFIG_DIR=/opt/sonic/etc
+      - SONIC_LOG_DIR=/opt/sonic/var/log
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/opt/sonic/scripts/health_check.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Management Container
+  sonic-mgmt:
+    build:
+      context: .
+      dockerfile: Dockerfile.mgmt
+    container_name: sonic-mgmt
+    hostname: sonic-mgmt
+    networks:
+      sonic-mgmt:
+        ipv4_address: 172.20.0.20
+    ports:
+      - "3000:3000"    # Management API
+      - "9092:9090"    # Prometheus (mapped to avoid conflicts)
+      - "3001:3001"    # Grafana
+    volumes:
+      - ./scripts:/scripts:rw
+      - ./configs:/configs:rw
+      - ./logs:/logs:ro
+      - ./docs:/docs:ro
+    environment:
+      - SONIC_HOST=172.20.0.10
+      - SONIC_USER=admin
+      - SONIC_PASS=YourPaSsWoRd
+    depends_on:
+      sonic-cpp:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Test Environment Container
+  sonic-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: sonic-test
+    hostname: sonic-test
+    networks:
+      sonic-data:
+        ipv4_address: 172.21.0.30
+      sonic-mgmt:
+        ipv4_address: 172.20.0.30
+    volumes:
+      - ./test-scripts:/test-scripts:rw
+      - ./logs:/logs:rw
+      - ./results:/results:rw
+    environment:
+      - SONIC_HOST=172.20.0.10
+      - TEST_MODE=automated
+    depends_on:
+      - sonic-cpp
+      - sonic-mgmt
+    restart: unless-stopped
+
+  # Redis Insight for Database Monitoring (Optional)
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: redis-insight
+    networks:
+      sonic-mgmt:
+        ipv4_address: 172.20.0.40
+    ports:
+      - "8001:8001"
+    volumes:
+      - redis-insight-data:/db
+    environment:
+      - RIPORT=8001
+    depends_on:
+      - sonic-cpp
+    restart: unless-stopped
+
+  # Log Aggregator (ELK Stack - Elasticsearch)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.15.0
+    container_name: elasticsearch
+    networks:
+      sonic-mgmt:
+        ipv4_address: 172.20.0.50
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    restart: unless-stopped
+
+  # Kibana for Log Visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.15.0
+    container_name: kibana
+    networks:
+      sonic-mgmt:
+        ipv4_address: 172.20.0.51
+    environment:
+      - ELASTICSEARCH_HOSTS=http://172.20.0.50:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  # Logstash for Log Processing
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.15.0
+    container_name: logstash
+    networks:
+      sonic-mgmt:
+        ipv4_address: 172.20.0.52
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./logstash/config:/usr/share/logstash/config:ro
+      - ./logs:/logs:ro
+    environment:
+      - "LS_JAVA_OPTS=-Xmx256m -Xms256m"
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+networks:
+  sonic-mgmt:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+    driver_opts:
+      com.docker.network.bridge.name: sonic-mgmt-br
+      com.docker.network.driver.mtu: 1500
+
+  sonic-data:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+          gateway: 172.21.0.1
+    driver_opts:
+      com.docker.network.bridge.name: sonic-data-br
+      com.docker.network.driver.mtu: 1500
+
+volumes:
+  sonic-cpp-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/sonic-cpp
+
+  redis-insight-data:
+    driver: local
+
+  elasticsearch-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/elasticsearch
+
+  prometheus-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/prometheus
+
+  grafana-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/grafana

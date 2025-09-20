@@ -1,0 +1,42 @@
+# SONiC SAI Demo Application - Integrates with Real SONiC Components
+FROM python:3.9-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    redis-tools \
+    openssh-client \
+    sshpass \
+    curl \
+    jq \
+    net-tools \
+    iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements-sai-demo.txt /tmp/
+RUN pip install --no-cache-dir -r /tmp/requirements-sai-demo.txt
+
+# Create application directory
+WORKDIR /app
+
+# Copy SAI demo application
+COPY src/python/sonic_sai_demo.py /app/
+COPY src/python/sonic_cli_wrapper.py /app/
+COPY src/python/sonic_redis_client.py /app/
+COPY scripts/sonic/ /app/scripts/
+
+# Create directories for logs and data
+RUN mkdir -p /var/log/sonic-sai-demo /var/lib/sonic-sai-demo
+
+# Set permissions
+RUN chmod +x /app/scripts/*.sh
+
+# Expose API port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Start the SAI demo application
+CMD ["python", "/app/sonic_sai_demo.py"]

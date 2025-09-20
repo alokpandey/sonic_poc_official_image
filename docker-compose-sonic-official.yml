@@ -1,0 +1,128 @@
+version: '3.8'
+
+services:
+  # SONiC Virtual Switch (Custom Build)
+  sonic-vs:
+    build:
+      context: .
+      dockerfile: Dockerfile.sonic-vs-real
+    container_name: sonic-vs
+    hostname: sonic-vs
+    privileged: true
+    networks:
+      sonic-net:
+        ipv4_address: 172.25.0.10
+    ports:
+      - "2222:22"      # SSH access to SONiC
+      - "6379:6379"    # Redis database
+    volumes:
+      - sonic-data:/var/lib/redis:rw
+      - sonic-logs:/var/log:rw
+    environment:
+      - SONIC_CFGGEN_EXTRA_OPTS=--print-data
+      - SONIC_DB_CLI_TIMEOUT=60
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - NET_RAW
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/health-check.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # SAI Demo Application (integrates with real SONiC)
+  sonic-sai-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.sai-demo-real
+    container_name: sonic-sai-demo
+    hostname: sonic-sai-demo
+    networks:
+      sonic-net:
+        ipv4_address: 172.25.0.20
+    ports:
+      - "8091:8080"    # SAI Demo API
+    volumes:
+      - sonic-logs:/var/log:rw
+    environment:
+      - SONIC_HOST=172.25.0.10
+      - SONIC_SSH_PORT=22
+      - SONIC_USER=admin
+      - SONIC_PASS=YourPaSsWoRd
+      - REDIS_HOST=172.25.0.10
+      - REDIS_PORT=6379
+    depends_on:
+      sonic-vs:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # BSP Demo Application
+  sonic-bsp-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.bsp-demo-real
+    container_name: sonic-bsp-demo
+    hostname: sonic-bsp-demo
+    networks:
+      sonic-net:
+        ipv4_address: 172.25.0.21
+    ports:
+      - "8092:8080"    # BSP Demo API
+    volumes:
+      - sonic-logs:/var/log:rw
+    environment:
+      - SONIC_HOST=172.25.0.10
+      - SONIC_SSH_PORT=22
+      - SONIC_USER=admin
+      - SONIC_PASS=YourPaSsWoRd
+    depends_on:
+      - sonic-vs
+    restart: unless-stopped
+
+  # Management Interface
+  sonic-mgmt:
+    build:
+      context: .
+      dockerfile: Dockerfile.sonic-mgmt-real
+    container_name: sonic-mgmt
+    hostname: sonic-mgmt
+    networks:
+      sonic-net:
+        ipv4_address: 172.25.0.30
+    ports:
+      - "3000:3000"    # Management Web UI
+    volumes:
+      - sonic-logs:/var/log:rw
+    environment:
+      - SONIC_HOST=172.25.0.10
+      - SONIC_SSH_PORT=22
+      - SONIC_USER=admin
+      - SONIC_PASS=YourPaSsWoRd
+      - REDIS_HOST=172.25.0.10
+      - REDIS_PORT=6379
+      - SAI_DEMO_URL=http://172.25.0.20:8080
+      - BSP_DEMO_URL=http://172.25.0.21:8080
+    depends_on:
+      - sonic-sai-demo
+      - sonic-bsp-demo
+    restart: unless-stopped
+
+networks:
+  sonic-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+          gateway: 172.25.0.1
+    driver_opts:
+      com.docker.network.bridge.name: sonic-br
+      com.docker.network.driver.mtu: 1500
+
+volumes:
+  sonic-data:
+    driver: local
+  sonic-logs:
+    driver: local

@@ -1,0 +1,47 @@
+# SONiC Management Interface
+FROM python:3.9-slim
+
+# Install system dependencies including Docker CLI
+RUN apt-get update && apt-get install -y \
+    openssh-client \
+    sshpass \
+    curl \
+    jq \
+    redis-tools \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y docker-ce-cli \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    Flask==2.3.3 \
+    redis==4.6.0 \
+    paramiko==3.3.1 \
+    requests==2.31.0 \
+    pyyaml==6.0.1
+
+# Create application directory
+WORKDIR /app
+
+# Copy application files
+COPY src/python/sonic_mgmt_api.py /app/
+COPY src/python/sonic_cli_wrapper.py /app/
+COPY src/python/sonic_redis_client.py /app/
+
+# Create directories
+RUN mkdir -p /var/log/sonic-mgmt
+
+# Expose management port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+# Start management interface
+CMD ["python", "/app/sonic_mgmt_api.py"]

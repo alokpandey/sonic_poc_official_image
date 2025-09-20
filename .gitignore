@@ -1,0 +1,87 @@
+# Build artifacts
+build/
+*.o
+*.so
+*.a
+*.exe
+
+# Compiled binaries
+sonic_functional_tests
+main_test_runner
+
+# Docker volumes and data
+data/
+logs/
+results/
+test_results/
+
+# Docker images and containers
+*.tar
+*.gz
+docker-sonic-vs.gz
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Documentation (except main doc)
+*.docx
+*.pdf
+docs/*.docx
+docs/*.pdf
+docs/*.md
+!SONIC_POC_Documentation.md
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.out
+*.err
+
+# Configuration overrides
+config.local.*
+.env.local
+
+# Test outputs
+*.test
+coverage.out
+
+# Backup files
+*.bak
+*.backup
+
+# Large files that shouldn't be in git
+sonic-buildimage/
+*.img
+*.iso
+
+# Runtime data
+monitoring/
+validation/
+api/
+mgmt-scripts/

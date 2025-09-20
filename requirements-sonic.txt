@@ -1,0 +1,46 @@
+# SONiC Python Dependencies
+
+# Web Framework for APIs
+flask==2.3.3
+flask-restful==0.3.10
+flask-cors==4.0.0
+gunicorn==21.2.0
+
+# HTTP and API clients
+requests==2.31.0
+urllib3==2.0.4
+
+# Configuration and Data Processing
+pyyaml==6.0.1
+configparser==5.3.0
+python-dotenv==1.0.0
+
+# Database and Caching
+redis==4.6.0
+
+# Monitoring and Metrics
+prometheus-client==0.17.1
+
+# Logging and Utilities
+loguru==0.7.0
+colorlog==6.7.0
+tabulate==0.9.0
+click==8.1.7
+
+# Date and Time
+python-dateutil==2.8.2
+pytz==2023.3
+
+# JSON and Data Validation
+jsonschema==4.19.0
+
+# Async Support
+asyncio==3.4.3
+aiohttp==3.8.5
+
+# System Monitoring
+psutil==5.9.5
+
+# Testing
+pytest==7.4.2
+pytest-asyncio==0.21.1

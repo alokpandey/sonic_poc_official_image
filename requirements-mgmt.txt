@@ -1,0 +1,64 @@
+# Management Container Python Requirements
+
+# Web Framework
+flask==2.3.3
+flask-restful==0.3.10
+flask-cors==4.0.0
+gunicorn==21.2.0
+
+# HTTP and API clients
+requests==2.31.0
+urllib3==2.0.4
+
+# Configuration and Data Processing
+pyyaml==6.0.1
+configparser==5.3.0
+python-dotenv==1.0.0
+
+# Database and Caching
+redis==4.6.0
+pymongo==4.5.0
+
+# Monitoring and Metrics
+prometheus-client==0.17.1
+grafana-api==1.0.3
+influxdb-client==1.37.0
+
+# Network Management
+paramiko==3.3.1
+netmiko==4.2.0
+pysnmp==4.4.12
+napalm==4.1.0
+
+# SSH and Remote Access
+fabric==3.2.2
+pexpect==4.8.0
+
+# Logging and Utilities
+loguru==0.7.0
+colorlog==6.7.0
+tabulate==0.9.0
+click==8.1.7
+
+# Date and Time
+python-dateutil==2.8.2
+pytz==2023.3
+
+# JSON and Data Validation
+jsonschema==4.19.0
+marshmallow==3.20.1
+
+# Async Support
+asyncio==3.4.3
+aiohttp==3.8.5
+
+# System Monitoring
+psutil==5.9.5
+py-cpuinfo==9.0.0
+
+# Docker Integration
+docker==6.1.3
+
+# Testing (for management validation)
+pytest==7.4.2
+pytest-asyncio==0.21.1
