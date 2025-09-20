@@ -254,9 +254,9 @@ int main(int argc, char* argv[]) {
                   << "╠══════════════════════════════════════════════════════════════╣\n";
         
         if (overall_success) {
-            std::cout << "║                    ✅ ALL TESTS PASSED                      ║\n";
+            std::cout << "║                    ALL TESTS PASSED                         ║\n";
         } else {
-            std::cout << "║                    ❌ SOME TESTS FAILED                     ║\n";
+            std::cout << "║                    SOME TESTS FAILED                        ║\n";
         }
         
         std::cout << "╚══════════════════════════════════════════════════════════════╝\n"

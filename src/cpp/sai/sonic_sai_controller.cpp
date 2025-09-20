@@ -140,10 +140,10 @@ bool SONiCSAIController::createVLAN(uint16_t vlan_id, const std::string& name) {
         return false;
     }
     
-    // Check if VLAN already exists
+    // Check if VLAN already exists and delete it first (for test cleanup)
     if (m_vlan_cache.find(vlan_id) != m_vlan_cache.end()) {
-        std::cerr << "[SAI] VLAN " << vlan_id << " already exists" << std::endl;
-        return false;
+        std::cout << "[SAI] VLAN " << vlan_id << " already exists, deleting first..." << std::endl;
+        deleteVLAN(vlan_id, true); // Silent deletion
     }
     
     // Create VLAN using SONiC config command
@@ -177,44 +177,58 @@ bool SONiCSAIController::createVLAN(uint16_t vlan_id, const std::string& name) {
 }
 
 bool SONiCSAIController::deleteVLAN(uint16_t vlan_id) {
-    std::cout << "[SAI] Deleting VLAN " << vlan_id << std::endl;
-    
+    return deleteVLAN(vlan_id, false);
+}
+
+bool SONiCSAIController::deleteVLAN(uint16_t vlan_id, bool silent) {
+    if (!silent) {
+        std::cout << "[SAI] Deleting VLAN " << vlan_id << std::endl;
+    }
+
     if (!validateVLANID(vlan_id)) {
-        std::cerr << "[SAI] Invalid VLAN ID: " << vlan_id << std::endl;
+        if (!silent) {
+            std::cerr << "[SAI] Invalid VLAN ID: " << vlan_id << std::endl;
+        }
         return false;
     }
-    
+
     // Check if VLAN exists
     if (m_vlan_cache.find(vlan_id) == m_vlan_cache.end()) {
-        std::cerr << "[SAI] VLAN " << vlan_id << " does not exist" << std::endl;
+        if (!silent) {
+            std::cerr << "[SAI] VLAN " << vlan_id << " does not exist" << std::endl;
+        }
         return false;
     }
-    
+
     // Remove all ports from VLAN first
     VLANInfo& vlan_info = m_vlan_cache[vlan_id];
     for (const auto& port : vlan_info.member_ports) {
         removePortFromVLAN(vlan_id, port);
     }
-    
+
     // Delete VLAN using SONiC config command
     std::string command = "config vlan del " + std::to_string(vlan_id);
     std::string output;
     bool result = executeSONiCCommand(command, output);
-    
+
     if (result) {
         // Remove from CONFIG_DB
         std::string vlan_key = "VLAN|Vlan" + std::to_string(vlan_id);
         std::string del_command = "DEL '" + vlan_key + "'";
         executeRedisCommand(del_command, 4, output);
-        
+
         // Update cache
         m_vlan_cache.erase(vlan_id);
-        
-        std::cout << "[SAI] VLAN " << vlan_id << " deleted successfully" << std::endl;
+
+        if (!silent) {
+            std::cout << "[SAI] VLAN " << vlan_id << " deleted successfully" << std::endl;
+        }
     } else {
-        std::cerr << "[SAI] Failed to delete VLAN " << vlan_id << ": " << output << std::endl;
+        if (!silent) {
+            std::cerr << "[SAI] Failed to delete VLAN " << vlan_id << ": " << output << std::endl;
+        }
     }
-    
+
     return result;
 }
 

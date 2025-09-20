@@ -2,7 +2,7 @@
 
 This repository contains a comprehensive Proof of Concept (POC) for SONiC (Software for Open Networking in the Cloud) Network Operating System using the official SONiC Docker image with full Redis orchestration and C++ testing framework.
 
-## 🎯 Overview
+## Overview
 
 This POC provides **real SONiC integration** with authentic orchestration flow through Redis databases, OrchAgent, syncd, and other SONiC daemons, featuring:
 
@@ -13,11 +13,11 @@ This POC provides **real SONiC integration** with authentic orchestration flow t
 - **Switch Abstraction**: VLAN management, port configuration, status control
 - **Event System**: Cable insertion/removal, link flap detection, SFP hot swap
 
-### ✅ What's Real vs Simulated
+### What's Real vs Simulated
 - **100% Real**: Redis databases, OrchAgent, syncd, ConfigMgr, SAI interface, SONiC CLI, database schemas
 - **Simulated**: Only the physical switch hardware (replaced with virtual switch)
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Docker installed and running
@@ -48,7 +48,7 @@ make -f Makefile.cpp all
 ./build/sonic_functional_tests --verbose
 ```
 
-## 🧪 Test Framework
+## Test Framework
 
 ### Test Categories (17 Total Tests)
 
@@ -90,7 +90,7 @@ make -f Makefile.cpp all
 ./build/sonic_functional_tests --quick --verbose
 ```
 
-## 🔧 Build System
+## Build System
 
 ### C++ Build Commands
 ```bash
@@ -117,7 +117,7 @@ make -f Makefile.cpp tests
 ./run_cpp_tests.sh all --verbose
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 sonic_poc_official_image/
@@ -136,7 +136,7 @@ sonic_poc_official_image/
 └── README.md                 # This file
 ```
 
-## 🗄️ Redis Database Integration
+## Redis Database Integration
 
 ### Database Usage
 - **CONFIG_DB (db 4)**: Configuration data (ports, VLANs, etc.)
@@ -155,7 +155,7 @@ docker exec sonic-vs-official redis-cli -n 0 HGET "PORT_TABLE:Ethernet0" "oper_s
 docker exec sonic-vs-official redis-cli -n 4 KEYS "VLAN|*"
 ```
 
-## 🔍 Features
+## Features
 
 ### Hardware Abstraction Layer (HAL)
 ```cpp
@@ -184,7 +184,7 @@ interrupt_controller->simulateCableInsertion("Ethernet0");
 interrupt_controller->simulateCableRemoval("Ethernet0");
 ```
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -210,7 +210,7 @@ sudo apt-get install build-essential g++ make
 docker exec sonic-vs-official redis-cli ping
 ```
 
-## 📄 Documentation
+## Documentation
 
 For comprehensive documentation, see `SONIC_POC_Documentation.md` which includes:
 - Detailed architecture explanations
@@ -219,7 +219,7 @@ For comprehensive documentation, see `SONIC_POC_Documentation.md` which includes
 - Troubleshooting guides
 - Implementation details
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -228,11 +228,11 @@ For comprehensive documentation, see `SONIC_POC_Documentation.md` which includes
 5. Ensure all tests pass
 6. Submit a pull request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - SONiC community for the open-source network operating system
 - Docker for containerization platform

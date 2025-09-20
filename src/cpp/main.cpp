@@ -182,7 +182,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
-        std::cout << "\n✅ SONiC POC initialization completed successfully!" << std::endl;
+        std::cout << "\nSONiC POC initialization completed successfully!" << std::endl;
         std::cout << "System is now operational. Press Ctrl+C to shutdown gracefully." << std::endl;
         
         // Run main monitoring loop

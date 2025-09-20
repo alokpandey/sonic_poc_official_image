@@ -84,6 +84,7 @@ public:
     // Initialize interrupt monitoring
     bool initialize();
     void cleanup();
+    void clearAllHandlers();
 
     // Cable Event Simulation (for testing)
     bool simulateCableInsertion(const std::string& port_name);
@@ -137,6 +138,7 @@ public:
 private:
     bool m_initialized;
     std::atomic<bool> m_monitoring;
+    std::atomic<bool> m_cleanup_done;
     std::string m_sonic_container_name;
     bool m_verbose_debug;
     
@@ -167,6 +169,7 @@ private:
     bool setRedisHashField(const std::string& key, const std::string& field, 
                           const std::string& value, int db_id = 4);
     std::string getRedisHashField(const std::string& key, const std::string& field, int db_id = 4);
+    bool getRedisHashField(const std::string& key, const std::string& field, int db_id, std::string& output);
     
     // Port state management
     bool updatePortState(const std::string& port_name);

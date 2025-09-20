@@ -94,6 +94,7 @@ public:
     // VLAN Management
     bool createVLAN(uint16_t vlan_id, const std::string& name = "");
     bool deleteVLAN(uint16_t vlan_id);
+    bool deleteVLAN(uint16_t vlan_id, bool silent);
     bool addPortToVLAN(uint16_t vlan_id, const std::string& port_name, bool tagged = true);
     bool removePortFromVLAN(uint16_t vlan_id, const std::string& port_name);
     VLANInfo getVLANInfo(uint16_t vlan_id);
@@ -151,13 +152,15 @@ public:
     bool addPortToLAG(const std::string& lag_name, const std::string& port_name);
     bool removePortFromLAG(const std::string& lag_name, const std::string& port_name);
 
+    // Redis communication (public for test framework access)
+    bool executeRedisCommand(const std::string& command, int db_id, std::string& output);
+
 private:
     bool m_initialized;
     std::string m_sonic_container_name;
     
     // Helper functions for SONiC communication
     bool executeSONiCCommand(const std::string& command, std::string& output);
-    bool executeRedisCommand(const std::string& command, int db_id, std::string& output);
     bool setRedisValue(const std::string& key, const std::string& value, int db_id = 4);
     std::string getRedisValue(const std::string& key, int db_id = 4);
     bool setRedisHashField(const std::string& key, const std::string& field, const std::string& value, int db_id = 4);

@@ -133,6 +133,7 @@ private:
     // Test data management
     void setupTestEnvironment();
     void cleanupTestEnvironment();
+    void cleanupExistingTestVLANs();
     bool verifyInitialState();
     
     // Test validation helpers
