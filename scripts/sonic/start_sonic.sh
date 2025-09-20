@@ -53,14 +53,14 @@ fi
 
 # Verify container is running
 if docker ps --format 'table {{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-    echo "✅ SONiC container ${CONTAINER_NAME} is running successfully!"
+    echo " SONiC container ${CONTAINER_NAME} is running successfully!"
     
     # Test Redis connectivity
     echo "Testing Redis connectivity..."
     if docker exec ${CONTAINER_NAME} redis-cli ping >/dev/null 2>&1; then
-        echo "✅ Redis is responding"
+        echo " Redis is responding"
     else
-        echo "⚠️  Redis is not responding yet, may need more time to initialize"
+        echo "  Redis is not responding yet, may need more time to initialize"
     fi
     
     # Show container info
@@ -80,6 +80,6 @@ if docker ps --format 'table {{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
     echo "make -f Makefile.cpp all && ./build/sonic_functional_tests --verbose"
     
 else
-    echo "❌ Failed to start SONiC container"
+    echo " Failed to start SONiC container"
     exit 1
 fi

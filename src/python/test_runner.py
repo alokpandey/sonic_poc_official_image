@@ -44,7 +44,7 @@ class SONiCTestRunner:
         }
         self.test_results.append(result)
         
-        status_symbol = "✅" if status == "PASS" else "❌" if status == "FAIL" else "⚠️"
+        status_symbol = "PASS" if status == "PASS" else "FAIL" if status == "FAIL" else "WARN"
         logger.info(f"{status_symbol} {test_name}: {status}")
         
         if details:
@@ -346,7 +346,7 @@ class SONiCTestRunner:
     
     def run_all_tests(self):
         """Run all test suites"""
-        logger.info("🚀 Starting SONiC POC comprehensive test suite")
+        logger.info("Starting SONiC POC comprehensive test suite")
         logger.info("=" * 60)
         
         start_time = time.time()
@@ -382,7 +382,7 @@ class SONiCTestRunner:
         total_tests = len(self.test_results)
         
         logger.info("=" * 60)
-        logger.info(f"🏁 Test suite completed: {passed_tests}/{total_tests} tests passed")
+        logger.info(f"Test suite completed: {passed_tests}/{total_tests} tests passed")
         
         return passed_tests == total_tests
     
@@ -405,12 +405,12 @@ class SONiCTestRunner:
         with open(report_file, 'w') as f:
             json.dump(report, f, indent=2)
         
-        logger.info(f"📊 Test report saved to: {report_file}")
-        
+        logger.info(f"Test report saved to: {report_file}")
+
         # Print summary
-        logger.info("\n📋 Test Summary:")
+        logger.info("\nTest Summary:")
         for result in self.test_results:
-            status_symbol = "✅" if result['status'] == "PASS" else "❌" if result['status'] == "FAIL" else "⚠️"
+            status_symbol = "PASS" if result['status'] == "PASS" else "FAIL" if result['status'] == "FAIL" else "WARN"
             duration_str = f" ({result['duration']:.2f}s)" if result['duration'] else ""
             logger.info(f"  {status_symbol} {result['test']}{duration_str}")
 

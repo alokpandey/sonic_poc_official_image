@@ -336,11 +336,11 @@ main() {
     
     # Run the tests
     if run_tests "$TEST_TYPE" "$TEST_ARGS"; then
-        print_success "All tests completed successfully! ✅"
+        print_success "All tests completed successfully!"
         show_results
         exit 0
     else
-        print_error "Some tests failed! ❌"
+        print_error "Some tests failed!"
         show_results
         exit 1
     fi

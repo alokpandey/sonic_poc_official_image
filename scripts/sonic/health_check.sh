@@ -27,10 +27,10 @@ error() {
 # Check if SONiC main process is running
 check_sonic_main() {
     if pgrep -f "sonic_poc" > /dev/null; then
-        log "✅ SONiC main process is running"
+        log " SONiC main process is running"
         return 0
     else
-        error "❌ SONiC main process is not running"
+        error " SONiC main process is not running"
         return 1
     fi
 }
@@ -38,10 +38,10 @@ check_sonic_main() {
 # Check Redis connectivity
 check_redis() {
     if redis-cli -h localhost -p 6379 ping > /dev/null 2>&1; then
-        log "✅ Redis is responding"
+        log " Redis is responding"
         return 0
     else
-        error "❌ Redis is not responding"
+        error " Redis is not responding"
         return 1
     fi
 }
@@ -52,17 +52,17 @@ check_apis() {
     
     # Check BSP API
     if curl -s -f http://localhost:8080/health > /dev/null 2>&1; then
-        log "✅ BSP API is responding"
+        log " BSP API is responding"
     else
-        error "❌ BSP API is not responding"
+        error " BSP API is not responding"
         api_status=1
     fi
     
     # Check SAI API
     if curl -s -f http://localhost:8081/health > /dev/null 2>&1; then
-        log "✅ SAI API is responding"
+        log " SAI API is responding"
     else
-        error "❌ SAI API is not responding"
+        error " SAI API is not responding"
         api_status=1
     fi
     
@@ -85,12 +85,12 @@ check_logs() {
         if [[ -f "$log_path" ]]; then
             # Check if log file was modified in the last 5 minutes
             if [[ $(find "$log_path" -mmin -5) ]]; then
-                log "✅ $log_file is active"
+                log " $log_file is active"
             else
-                warn "⚠️  $log_file exists but may be stale"
+                warn "  $log_file exists but may be stale"
             fi
         else
-            error "❌ $log_file not found"
+            error " $log_file not found"
             log_status=1
         fi
     done
@@ -105,19 +105,19 @@ check_resources() {
     # Check memory usage
     local mem_usage=$(free | grep Mem | awk '{printf "%.1f", $3/$2 * 100.0}')
     if (( $(echo "$mem_usage > 90" | bc -l) )); then
-        error "❌ High memory usage: ${mem_usage}%"
+        error " High memory usage: ${mem_usage}%"
         resource_status=1
     else
-        log "✅ Memory usage: ${mem_usage}%"
+        log " Memory usage: ${mem_usage}%"
     fi
     
     # Check disk usage
     local disk_usage=$(df /opt/sonic | tail -1 | awk '{print $5}' | sed 's/%//')
     if [[ $disk_usage -gt 90 ]]; then
-        error "❌ High disk usage: ${disk_usage}%"
+        error " High disk usage: ${disk_usage}%"
         resource_status=1
     else
-        log "✅ Disk usage: ${disk_usage}%"
+        log " Disk usage: ${disk_usage}%"
     fi
     
     return $resource_status
@@ -125,7 +125,7 @@ check_resources() {
 
 # Main health check function
 main() {
-    log "🔍 Starting SONiC health check..."
+    log " Starting SONiC health check..."
     
     local overall_status=0
     
@@ -137,10 +137,10 @@ main() {
     check_resources || overall_status=1
     
     if [[ $overall_status -eq 0 ]]; then
-        log "🎉 All health checks passed!"
+        log " All health checks passed!"
         exit 0
     else
-        error "💥 Some health checks failed!"
+        error " Some health checks failed!"
         exit 1
     fi
 }
